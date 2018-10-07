@@ -6,7 +6,7 @@ import (
 	"server"
 )
 
-func main()  {
+func main() {
 	port := flag.String("p", "80", "Listen port.")
 	flag.Parse()
 	log.Println("Server listening at", *port)

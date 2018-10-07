@@ -1,32 +1,42 @@
 package server
 
 import (
+	"encoding/base64"
+	"github.com/gorilla/websocket"
 	"log"
 	"net"
 	"net/http"
-	"time"
-	"github.com/gorilla/websocket"
-	"encoding/base64"
 	"sync"
+	"time"
 )
 
 const (
 	// transmission type
-	dataT   = websocket.BinaryMessage
+	dataT = websocket.BinaryMessage
+
 	// connection time out
 	timeout = 10 * time.Second
+
+	// buffer size.
+	bufSize = 1024
 )
 
-var upgrader = websocket.Upgrader{
-	HandshakeTimeout: timeout,
-	ReadBufferSize:   1024,
-	WriteBufferSize:  1024,
-	WriteBufferPool:  &sync.Pool{
+var (
+	// buffer pool.
+	bufPool = &sync.Pool{
 		New: func() interface{} {
-			return make([]byte, 1024)
+			return make([]byte, bufSize)
 		},
-	},
-}
+	}
+
+	// websocket upgrader.
+	upgrader = websocket.Upgrader{
+		HandshakeTimeout: timeout,
+		ReadBufferSize:   bufSize,
+		WriteBufferSize:  bufSize,
+		WriteBufferPool:  new(sync.Pool),
+	}
+)
 
 // NewServer create a falcon-ws server.
 func NewServer(port string) {
@@ -39,7 +49,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	hostEnc := target.Get("h")
 	portEnc := target.Get("p")
 
-	if hostEnc== "" || portEnc == "" {
+	if hostEnc == "" || portEnc == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -90,7 +100,9 @@ func recive(conn net.Conn, ws *websocket.Conn) {
 	defer ws.Close()
 	defer conn.Close()
 
-	buf := make([]byte, 1024)
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {

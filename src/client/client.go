@@ -1,38 +1,46 @@
 package client
 
 import (
+	"encoding/base64"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"log"
 	"net"
 	"socks5"
-	"time"
-
-	"github.com/gorilla/websocket"
-	"encoding/base64"
 	"sync"
+	"time"
 )
 
 const (
 	// transmission type
-	dataT 		= websocket.BinaryMessage
+	dataT = websocket.BinaryMessage
+
 	// connection time out
-	timeout   = 10 * time.Second
+	timeout = 10 * time.Second
+
+	// buffer size.
+	bufSize = 1024
+)
+
+var (
+	// buffer pool.
+	bufPool = &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, bufSize)
+		},
+	}
+
+	// websocket dialer.
+	dialer = websocket.Dialer{
+		HandshakeTimeout: timeout,
+		ReadBufferSize:   bufSize,
+		WriteBufferSize:  bufSize,
+		WriteBufferPool:  new(sync.Pool),
+	}
 )
 
 // NewClient create a client.
 func NewClient(socks5Addr string, serverAddr string) {
-	// websocket dialer.
-	dialer := websocket.Dialer{
-		HandshakeTimeout: timeout,
-		ReadBufferSize:   1024,
-		WriteBufferSize:  1024,
-		WriteBufferPool:  &sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 1024)
-			},
-		},
-	}
-
 	socks5.ListenAndServe(socks5Addr, func(c net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
@@ -60,7 +68,9 @@ func send(conn net.Conn, ws *websocket.Conn) {
 	defer ws.Close()
 	defer conn.Close()
 
-	buf := make([]byte, 1024)
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
