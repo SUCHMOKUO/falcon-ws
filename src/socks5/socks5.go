@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"sync"
 )
 
 const (
@@ -24,13 +25,20 @@ var (
 	// +----+-----+-------+------+----------+----------+
 	infoRep = []byte{
 		0x05, 0x00, 0x00, 0x01,
-		// Fake bind addr
+		// Fake bind addr.
 		0x00, 0x00, 0x00, 0x00,
-		// Fake bind port
+		// Fake bind port.
 		0x10, 0x10,
 	}
 
-	// errors
+	// buffer pool.
+	bufPool = &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 257)
+		},
+	}
+
+	// errors.
 	invalid   = errors.New("Invalid target info")
 	notSocks5 = errors.New("Not Socks5")
 )
@@ -72,7 +80,9 @@ func ListenAndServe(socks5Addr string, handler ConnHandler) {
 }
 
 func socks5Handshake(conn net.Conn) (*Target, error) {
-	buf := make([]byte, 257)
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
 	// consult.
 	_, err := conn.Read(buf)
 	if err != nil {
