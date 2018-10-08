@@ -9,6 +9,7 @@ import (
 	"socks5"
 	"sync"
 	"time"
+	"net/http"
 )
 
 const (
@@ -40,14 +41,20 @@ var (
 )
 
 // NewClient create a client.
-func NewClient(socks5Addr string, serverAddr string) {
+func NewClient(socks5Addr string, serverAddr string, fakeHost string) {
+	// request header.
+	reqHeader := http.Header{}
+	if fakeHost != "" {
+		// add fake host field.
+		reqHeader.Add("Host", fakeHost)
+	}
 	socks5.ListenAndServe(socks5Addr, func(c net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
 		url := fmt.Sprintf("ws://%s/free?h=%s&p=%s", serverAddr, host, port)
 		// log.Println(url)
-		ws, res, err := dialer.Dial(url, nil)
+		ws, res, err := dialer.Dial(url, reqHeader)
 		if err != nil {
 			log.Println("Dial proxy server error:", err)
 			c.Close()

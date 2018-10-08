@@ -65,7 +65,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	host := string(hostS)
 	port := string(portS)
 
-	// log.Println(host, port)
+	// log.Println(host, port, r.Host)
 
 	addr := net.JoinHostPort(host, port)
 	ch := make(chan net.Conn, 1)

@@ -49,7 +49,7 @@ type Target struct {
 	Port string
 }
 
-// ConnHandler connection handler function
+// ConnHandler handle the connection
 // after socks5 handshake succeeded.
 type ConnHandler = func(net.Conn, *Target)
 
