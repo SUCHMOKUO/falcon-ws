@@ -13,7 +13,7 @@ git clone https://github.com/SUCHMOKUO/falcon-ws.git
 cd ./falcon-ws
 chmod +x ./build.sh
 
-# build for current platdorm.
+# build for current platform.
 ./build.sh
 ```
 
