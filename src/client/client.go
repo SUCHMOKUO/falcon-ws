@@ -21,6 +21,9 @@ const (
 
 	// buffer size.
 	bufSize = 1024
+
+	// fake User-Agent.
+	userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.2 (KHTML, like Gecko) Chrome/22.0.1216.0 Safari/537.2"
 )
 
 var (
@@ -46,8 +49,11 @@ func NewClient(socks5Addr string, serverAddr string, fakeHost string) {
 	reqHeader := http.Header{}
 	if fakeHost != "" {
 		// add fake host field.
-		reqHeader.Add("Host", fakeHost)
+		reqHeader.Set("Host", fakeHost)
 	}
+	// fake user-agent field.
+	reqHeader.Set("User-Agent", userAgent)
+
 	socks5.ListenAndServe(socks5Addr, func(c net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))

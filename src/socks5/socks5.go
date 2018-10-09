@@ -39,8 +39,8 @@ var (
 	}
 
 	// errors.
-	invalid   = errors.New("Invalid target info")
-	notSocks5 = errors.New("Not Socks5")
+	errInvalid   = errors.New("Invalid target info")
+	errNotSocks5 = errors.New("Not Socks5")
 )
 
 // Target target server info.
@@ -90,7 +90,7 @@ func socks5Handshake(conn net.Conn) (*Target, error) {
 	}
 
 	if buf[0] != 0x05 {
-		return nil, notSocks5
+		return nil, errNotSocks5
 	}
 
 	// reply for consult.
@@ -128,30 +128,30 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 	switch buf[0] {
 	case ipv4:
 		if l < 7 {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		target.Host = net.IP(buf[1:5]).String()
 
 	case domain:
 		domainLen := int(buf[1])
 		if l < 4+domainLen {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		host := string(buf[2 : domainLen+2])
 		ok, err := isDomain(host)
 		if !ok || err != nil {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		target.Host = host
 
 	case ipv6:
 		if l < 19 {
-			return nil, invalid
+			return nil, errInvalid
 		}
 		target.Host = net.IP(buf[1:17]).String()
 
 	default:
-		return nil, invalid
+		return nil, errInvalid
 	}
 
 	return target, nil
