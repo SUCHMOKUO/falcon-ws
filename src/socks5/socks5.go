@@ -4,9 +4,9 @@ import (
 	"errors"
 	"log"
 	"net"
-	"regexp"
 	"strconv"
 	"sync"
+	"util"
 )
 
 const (
@@ -138,7 +138,7 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 			return nil, errInvalid
 		}
 		host := string(buf[2 : domainLen+2])
-		ok, err := isDomain(host)
+		ok, err := util.IsDomain(host)
 		if !ok || err != nil {
 			return nil, errInvalid
 		}
@@ -155,9 +155,4 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 	}
 
 	return target, nil
-}
-
-// detect if value match the format of domain.
-func isDomain(host string) (bool, error) {
-	return regexp.MatchString(`\.[a-z]{2,}$`, host)
 }

@@ -1,15 +1,16 @@
 package client
 
 import (
-	"fmt"
+	"encoding/base64"
 	"github.com/gorilla/websocket"
 	"log"
 	"net"
+	"net/http"
 	"socks5"
+	"strings"
 	"sync"
 	"time"
-	"net/http"
-	"encoding/base64"
+	"util"
 )
 
 const (
@@ -55,10 +56,62 @@ type Config struct {
 	// secure flag. true for using https
 	// instead of http.
 	Secure bool
+	// lookup flag. if it's false, client will
+	// not lookup the ip and cache it.
+	Lookup bool
+}
+
+func (conf *Config) lookupServer() {
+	if conf.Secure || !conf.Lookup {
+		// https enabled or non-lookup
+		// flag is true.
+		return
+	}
+
+	addr := strings.Split(conf.ServerAddr, ":")
+	if len(addr) < 2 {
+		log.Fatalln("server address format error!")
+	}
+
+	host := addr[0]
+	port := addr[1]
+
+	ok, err := util.IsDomain(host)
+	if err != nil {
+		log.Fatalln("server address format error!")
+	}
+
+	if !ok {
+		// is ip.
+		return
+	}
+
+	// is domain.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	ip := ips[0]
+	l := len(ip)
+	if l == 4 {
+		// ipv4.
+		conf.ServerAddr = ip.String() + ":" + port
+		return
+	}
+	if l == 16 {
+		// ipv6.
+		conf.ServerAddr = "[" + ip.String() + "]" + ":" + port
+		return
+	}
 }
 
 // NewClient create a client.
 func NewClient(conf *Config) {
+	log.Println("client initializing, please wait...")
+	conf.lookupServer()
+	log.Println("done! get server address:", conf.ServerAddr)
+
 	// request header.
 	reqHeader := http.Header{}
 	if conf.FakeHost != "" {
@@ -73,7 +126,8 @@ func NewClient(conf *Config) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
-		url := fmt.Sprintf("%s/free?h=%s&p=%s", conf.ServerAddr, host, port)
+		url := conf.ServerAddr + "/free?h=" + host + "&p=" + port;
+
 		if conf.Secure {
 			// https.
 			url = "wss://" + url
