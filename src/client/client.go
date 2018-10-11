@@ -109,9 +109,9 @@ func (conf *Config) lookupServer() {
 
 // NewClient create a client.
 func NewClient(conf *Config) {
-	log.Println("client initializing, please wait...")
+	log.Println("Client initializing, please wait...")
 	conf.lookupServer()
-	log.Println("done! get server address:", conf.ServerAddr)
+	log.Println("Done! get server address:", conf.ServerAddr)
 
 	// request header.
 	reqHeader := http.Header{}
@@ -123,6 +123,7 @@ func NewClient(conf *Config) {
 	reqHeader.Set("User-Agent", userAgent)
 
 	// start socks5 server.
+	log.Println("Socks5 server listening at", conf.Socks5Addr)
 	socks5.ListenAndServe(conf.Socks5Addr, func(c net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))

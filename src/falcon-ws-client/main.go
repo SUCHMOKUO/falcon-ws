@@ -3,7 +3,6 @@ package main
 import (
 	"client"
 	"flag"
-	"log"
 )
 
 func main() {
@@ -42,6 +41,5 @@ func main() {
 		Lookup:     *lookup,
 	}
 
-	log.Println("Socks5 server listening at", *socks5Addr)
 	client.NewClient(config)
 }
