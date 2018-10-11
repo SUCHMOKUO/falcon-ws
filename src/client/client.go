@@ -24,7 +24,7 @@ const (
 	bufSize = 1024
 
 	// fake User-Agent.
-	userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.2 (KHTML, like Gecko) Chrome/22.0.1216.0 Safari/537.2"
+	userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
 )
 
 var (
@@ -48,16 +48,20 @@ var (
 type Config struct {
 	// local socks5 address for listening.
 	Socks5Addr string
+
 	// proxy server address.
 	ServerAddr string
+
 	// fake 'Host' field in request header
 	// for against qos.
 	FakeHost string
+
 	// secure flag. true for using https
 	// instead of http.
 	Secure bool
+
 	// lookup flag. if it's false, client will
-	// not lookup the ip and cache it.
+	// not lookup the server ip and cache it.
 	Lookup bool
 }
 
@@ -93,16 +97,13 @@ func (conf *Config) lookupServer() {
 	}
 
 	ip := ips[0]
-	l := len(ip)
-	if l == 4 {
+
+	if ip.To4() != nil {
 		// ipv4.
 		conf.ServerAddr = ip.String() + ":" + port
-		return
-	}
-	if l == 16 {
+	} else {
 		// ipv6.
-		conf.ServerAddr = "[" + ip.String() + "]" + ":" + port
-		return
+		conf.ServerAddr = "[" + ip.String() + "]:" + port
 	}
 }
 

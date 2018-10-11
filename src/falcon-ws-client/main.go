@@ -30,16 +30,16 @@ func main() {
 	lookup := flag.Bool(
 		"lookup",
 		true,
-		"Flag for enable dns cache. if it's true, it will lookup the ip of host and cache it.")
+		"Flag for enable dns cache. if it's true, it will lookup the server ip of host and cache it.")
 
 	flag.Parse()
 
 	config := &client.Config{
 		Socks5Addr: *socks5Addr,
 		ServerAddr: *serverAddr,
-		FakeHost: *fakeHost,
-		Secure: *secure,
-		Lookup: *lookup,
+		FakeHost:   *fakeHost,
+		Secure:     *secure,
+		Lookup:     *lookup,
 	}
 
 	log.Println("Socks5 server listening at", *socks5Addr)
