@@ -63,6 +63,10 @@ type Config struct {
 	// lookup flag. if it's false, client will
 	// not lookup the server ip and cache it.
 	Lookup bool
+
+	// ipv6 flag. if it's true, the ipv6 address
+	// of proxy server will be used first.
+	IPv6 bool
 }
 
 func (conf *Config) lookupServer() {
@@ -86,7 +90,7 @@ func (conf *Config) lookupServer() {
 	}
 
 	if !ok {
-		// is ip.
+		// not domain.
 		return
 	}
 
@@ -96,15 +100,20 @@ func (conf *Config) lookupServer() {
 		log.Fatalln(err)
 	}
 
-	ip := ips[0]
-
-	if ip.To4() != nil {
-		// ipv4.
-		conf.ServerAddr = ip.String() + ":" + port
-	} else {
-		// ipv6.
-		conf.ServerAddr = "[" + ip.String() + "]:" + port
+	if conf.IPv6 {
+		// if proxy server has ipv6 address,
+		// use ipv6 first.
+		if ip := util.FindIP(ips, util.IsIPv6); ip != nil {
+			conf.ServerAddr = "[" + ip.String() + "]:" + port
+			return
+		}
 	}
+
+	ip := util.FindIP(ips, util.IsIPv4)
+	if ip == nil {
+		log.Fatalln("Proxy server only has ipv6 address! please enable '-6' flag!")
+	}
+	conf.ServerAddr = ip.String() + ":" + port
 }
 
 // NewClient create a client.
@@ -123,7 +132,6 @@ func NewClient(conf *Config) {
 	reqHeader.Set("User-Agent", userAgent)
 
 	// start socks5 server.
-	log.Println("Socks5 server listening at", conf.Socks5Addr)
 	socks5.ListenAndServe(conf.Socks5Addr, func(c net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))

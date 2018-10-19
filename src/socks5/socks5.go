@@ -60,6 +60,8 @@ func ListenAndServe(socks5Addr string, handler ConnHandler) {
 		log.Fatalln("Socks5 服务器监听失败，地址有误或端口被占用？")
 	}
 
+	log.Println("Socks5 server listening at", socks5Addr)
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
