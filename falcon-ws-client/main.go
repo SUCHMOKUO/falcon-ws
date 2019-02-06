@@ -1,8 +1,9 @@
 package main
 
 import (
-	"client"
 	"flag"
+
+	"github.com/SUCHMOKUO/falcon-ws/client"
 )
 
 func main() {

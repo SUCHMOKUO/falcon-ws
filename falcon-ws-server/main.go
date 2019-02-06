@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"log"
-	"server"
+
+	"github.com/SUCHMOKUO/falcon-ws/server"
 )
 
 func main() {

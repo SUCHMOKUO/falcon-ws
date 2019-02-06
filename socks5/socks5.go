@@ -6,7 +6,8 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"util"
+
+	"github.com/SUCHMOKUO/falcon-ws/util"
 )
 
 const (
@@ -124,7 +125,7 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 	target := new(Target)
 
 	l := len(buf)
-	port := int(buf[l-2]) << 8 | int(buf[l-1])
+	port := int(buf[l-2])<<8 | int(buf[l-1])
 	target.Port = strconv.Itoa(port)
 
 	switch buf[0] {

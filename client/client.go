@@ -2,15 +2,16 @@ package client
 
 import (
 	"encoding/base64"
-	"github.com/gorilla/websocket"
 	"log"
 	"net"
 	"net/http"
-	"socks5"
 	"strings"
 	"sync"
 	"time"
-	"util"
+
+	"github.com/SUCHMOKUO/falcon-ws/socks5"
+	"github.com/SUCHMOKUO/falcon-ws/util"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -136,7 +137,7 @@ func NewClient(conf *Config) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
-		url := conf.ServerAddr + "/free?h=" + host + "&p=" + port;
+		url := conf.ServerAddr + "/free?h=" + host + "&p=" + port
 
 		if conf.Secure {
 			// https.
