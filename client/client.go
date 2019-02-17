@@ -43,9 +43,9 @@ type Client struct {
 	Socks5Addr string
 
 	// server info.
-	Host string
-	Port string
-	wsAddr string
+	Host   string
+	Port   string
+	WSAddr string
 
 	// fake 'Host' field in request header
 	// for against qos.
@@ -138,7 +138,7 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 		schema = "ws://"
 	}
 	if !lookup {
-		c.wsAddr = schema + c.Host + ":" + c.Port
+		c.WSAddr = schema + c.Host + ":" + c.Port
 		return c
 	}
 	var ipstr string
@@ -148,13 +148,13 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 	if util.IsIPv6(ip) {
 		ipstr = "[" + ip.String() + "]"
 	}
-	c.wsAddr = schema + ipstr + ":" + c.Port
+	c.WSAddr = schema + ipstr + ":" + c.Port
 	return c
 }
 
 // Run falcon.
 func (c *Client) Run() {
-	log.Println("falcon server:", c.wsAddr)
+	log.Println("falcon server:", c.WSAddr)
 	log.Println("use host:", c.header.Get("Host"))
 	log.Println("use user-agent:", c.header.Get("User-Agent"))
 
@@ -163,7 +163,7 @@ func (c *Client) Run() {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
-		url := c.wsAddr + "/free?h=" + host + "&p=" + port
+		url := c.WSAddr + "/free?h=" + host + "&p=" + port
 		ws, res, err := c.dialer.Dial(url, c.header)
 		if err != nil {
 			log.Println("Dial proxy server error:", err)
