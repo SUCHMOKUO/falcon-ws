@@ -67,10 +67,10 @@ type Client struct {
 	IPv6 bool
 
 	// http header
-	header http.Header
+	Header http.Header
 
 	// websocket dialer.
-	dialer websocket.Dialer
+	Dialer websocket.Dialer
 }
 
 // NewClient return new falcon client instance.
@@ -82,7 +82,7 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 	c.Secure = secure
 	c.Lookup = lookup
 	c.IPv6 = ipv6
-	c.dialer = websocket.Dialer{
+	c.Dialer = websocket.Dialer{
 		HandshakeTimeout: timeout,
 		ReadBufferSize:   bufSize,
 		WriteBufferSize:  bufSize,
@@ -100,7 +100,7 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 	if c.Secure {
 		tlsCfg := new(tls.Config)
 		tlsCfg.ServerName = c.Host
-		c.dialer.TLSClientConfig = tlsCfg
+		c.Dialer.TLSClientConfig = tlsCfg
 	}
 
 	// init fake header.
@@ -117,7 +117,7 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 	} else {
 		reqHeader.Set("User-Agent", defaultUserAgent)
 	}
-	c.header = reqHeader
+	c.Header = reqHeader
 
 	// lookup.
 	var ip net.IP
@@ -155,8 +155,8 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 // Run falcon.
 func (c *Client) Run() {
 	log.Println("falcon server:", c.WSAddr)
-	log.Println("use host:", c.header.Get("Host"))
-	log.Println("use user-agent:", c.header.Get("User-Agent"))
+	log.Println("use host:", c.Header.Get("Host"))
+	log.Println("use user-agent:", c.Header.Get("User-Agent"))
 
 	// start socks5 server.
 	socks5.ListenAndServe(c.Socks5Addr, func(conn net.Conn, t *socks5.Target) {
@@ -164,7 +164,7 @@ func (c *Client) Run() {
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
 		url := c.WSAddr + "/free?h=" + host + "&p=" + port
-		ws, res, err := c.dialer.Dial(url, c.header)
+		ws, res, err := c.Dialer.Dial(url, c.Header)
 		if err != nil {
 			log.Println("Dial proxy server error:", err)
 			conn.Close()
