@@ -141,8 +141,7 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 			return nil, errInvalid
 		}
 		host := string(buf[2 : domainLen+2])
-		ok, err := util.IsDomain(host)
-		if !ok || err != nil {
+		if !util.IsDomain(host) {
 			return nil, errInvalid
 		}
 		target.Host = host

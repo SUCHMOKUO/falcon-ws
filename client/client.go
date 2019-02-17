@@ -1,11 +1,11 @@
 package client
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,9 +23,6 @@ const (
 
 	// buffer size.
 	bufSize = 1024
-
-	// fake User-Agent.
-	userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
 )
 
 var (
@@ -36,26 +33,26 @@ var (
 		},
 	}
 
-	// websocket dialer.
-	dialer = websocket.Dialer{
-		HandshakeTimeout: timeout,
-		ReadBufferSize:   bufSize,
-		WriteBufferSize:  bufSize,
-		WriteBufferPool:  new(sync.Pool),
-	}
+	// fake User-Agent.
+	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
 )
 
-// Config for client.
-type Config struct {
+// Client
+type Client struct {
 	// local socks5 address for listening.
 	Socks5Addr string
 
-	// proxy server address.
-	ServerAddr string
+	// server info.
+	Host string
+	Port string
+	wsAddr string
 
 	// fake 'Host' field in request header
 	// for against qos.
 	FakeHost string
+
+	// fake User-Agent.
+	UserAgent string
 
 	// secure flag. true for using https
 	// instead of http.
@@ -68,99 +65,119 @@ type Config struct {
 	// ipv6 flag. if it's true, the ipv6 address
 	// of proxy server will be used first.
 	IPv6 bool
+
+	// http header
+	header http.Header
+
+	// websocket dialer.
+	dialer websocket.Dialer
 }
 
-func (conf *Config) lookupServer() {
-	if conf.Secure || !conf.Lookup {
-		// https enabled or non-lookup
-		// flag is true.
-		return
+// NewClient return new falcon client instance.
+func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, lookup, ipv6 bool) *Client {
+	c := new(Client)
+	c.Socks5Addr = socks5addr
+	c.FakeHost = fakehost
+	c.UserAgent = useragent
+	c.Secure = secure
+	c.Lookup = lookup
+	c.IPv6 = ipv6
+	c.dialer = websocket.Dialer{
+		HandshakeTimeout: timeout,
+		ReadBufferSize:   bufSize,
+		WriteBufferSize:  bufSize,
+		WriteBufferPool:  new(sync.Pool),
 	}
 
-	addr := strings.Split(conf.ServerAddr, ":")
-	if len(addr) < 2 {
-		log.Fatalln("server address format error!")
-	}
-
-	host := addr[0]
-	port := addr[1]
-
-	ok, err := util.IsDomain(host)
+	host, port, err := net.SplitHostPort(serveraddr)
 	if err != nil {
 		log.Fatalln("server address format error!")
 	}
+	c.Host = host
+	c.Port = port
 
-	if !ok {
-		// not domain.
-		return
+	// tls setting.
+	if c.Secure {
+		tlsCfg := new(tls.Config)
+		tlsCfg.ServerName = c.Host
+		c.dialer.TLSClientConfig = tlsCfg
 	}
 
-	// is domain.
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		log.Fatalln(err)
+	// init fake header.
+	reqHeader := http.Header{}
+	if c.FakeHost != "" && !c.Secure {
+		// add fake host field.
+		reqHeader.Set("Host", fakehost)
+	} else {
+		reqHeader.Set("Host", c.Host)
 	}
+	// fake user-agent field.
+	if c.UserAgent != "" {
+		reqHeader.Set("User-Agent", c.UserAgent)
+	} else {
+		reqHeader.Set("User-Agent", defaultUserAgent)
+	}
+	c.header = reqHeader
 
-	if conf.IPv6 {
-		// if proxy server has ipv6 address,
-		// use ipv6 first.
-		if ip := util.FindIP(ips, util.IsIPv6); ip != nil {
-			conf.ServerAddr = "[" + ip.String() + "]:" + port
-			return
+	// lookup.
+	var ip net.IP
+	if c.Lookup && util.IsDomain(c.Host) {
+		log.Println("lookup for server", c.Host, "ip address...")
+		ip, err = util.Lookup(c.Host, c.IPv6)
+		if err != nil {
+			log.Fatalln(err)
 		}
 	}
 
-	ip := util.FindIP(ips, util.IsIPv4)
-	if ip == nil {
-		log.Fatalln("Proxy server only has ipv6 address! please enable '-6' flag!")
+	// get ws address.
+	var schema string
+	if secure {
+		schema = "wss://"
 	}
-	conf.ServerAddr = ip.String() + ":" + port
+	if !secure {
+		schema = "ws://"
+	}
+	if !lookup {
+		c.wsAddr = schema + c.Host + ":" + c.Port
+		return c
+	}
+	var ipstr string
+	if util.IsIPv4(ip) {
+		ipstr = ip.String()
+	}
+	if util.IsIPv6(ip) {
+		ipstr = "[" + ip.String() + "]"
+	}
+	c.wsAddr = schema + ipstr + ":" + c.Port
+	return c
 }
 
-// NewClient create a client.
-func NewClient(conf *Config) {
-	log.Println("Client initializing, please wait...")
-	conf.lookupServer()
-	log.Println("Done! get server address:", conf.ServerAddr)
-
-	// request header.
-	reqHeader := http.Header{}
-	if conf.FakeHost != "" {
-		// add fake host field.
-		reqHeader.Set("Host", conf.FakeHost)
-	}
-	// fake user-agent field.
-	reqHeader.Set("User-Agent", userAgent)
+// Run falcon.
+func (c *Client) Run() {
+	log.Println("falcon server:", c.wsAddr)
+	log.Println("use host:", c.header.Get("Host"))
+	log.Println("use user-agent:", c.header.Get("User-Agent"))
 
 	// start socks5 server.
-	socks5.ListenAndServe(conf.Socks5Addr, func(c net.Conn, t *socks5.Target) {
+	socks5.ListenAndServe(c.Socks5Addr, func(conn net.Conn, t *socks5.Target) {
 		// url encode.
 		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
 		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
-		url := conf.ServerAddr + "/free?h=" + host + "&p=" + port
-
-		if conf.Secure {
-			// https.
-			url = "wss://" + url
-		} else {
-			// http.
-			url = "ws://" + url
-		}
-
-		ws, res, err := dialer.Dial(url, reqHeader)
+		url := c.wsAddr + "/free?h=" + host + "&p=" + port
+		ws, res, err := c.dialer.Dial(url, c.header)
 		if err != nil {
 			log.Println("Dial proxy server error:", err)
-			c.Close()
+			conn.Close()
 			return
 		}
 		if res.StatusCode == 404 {
 			log.Println("Empty target address or port.")
-			c.Close()
+			conn.Close()
 			return
 		}
 
-		go send(c, ws)
-		go recive(ws, c)
+		go send(conn, ws)
+		go recive(ws, conn)
 	})
 }
 
