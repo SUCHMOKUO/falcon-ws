@@ -50,12 +50,12 @@ type Target struct {
 	Port string
 }
 
-// ConnHandler handle the connection
+// ProxyFunc handle the connection
 // after socks5 handshake succeeded.
-type ConnHandler = func(net.Conn, *Target)
+type ProxyFunc = func(net.Conn, *Target)
 
 // ListenAndServe create a socks5 server.
-func ListenAndServe(socks5Addr string, handler ConnHandler) {
+func ListenAndServe(socks5Addr string, p ProxyFunc) {
 	l, err := net.Listen("tcp", socks5Addr)
 	if err != nil {
 		log.Fatalln("Socks5 服务器监听失败，地址有误或端口被占用？")
@@ -68,18 +68,19 @@ func ListenAndServe(socks5Addr string, handler ConnHandler) {
 		if err != nil {
 			continue
 		}
-
-		go func() {
-			target, err := socks5Handshake(conn)
-			if err != nil {
-				conn.Close()
-				log.Println("Socks5 handshake error:", err)
-				return
-			}
-			// start proxy.
-			handler(conn, target)
-		}()
+		go handleSocks5(conn, p)
 	}
+}
+
+func handleSocks5(socksConn net.Conn, p ProxyFunc) {
+	target, err := socks5Handshake(socksConn)
+	if err != nil {
+		socksConn.Close()
+		log.Println("Socks5 handshake error:", err)
+		return
+	}
+	// start proxy.
+	go p(socksConn, target)
 }
 
 func socks5Handshake(conn net.Conn) (*Target, error) {

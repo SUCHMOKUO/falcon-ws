@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/base64"
+	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
 	"log"
 	"net"
@@ -11,9 +12,6 @@ import (
 )
 
 const (
-	// transmission type
-	dataT = websocket.BinaryMessage
-
 	// connection time out
 	timeout = 10 * time.Second
 
@@ -22,13 +20,6 @@ const (
 )
 
 var (
-	// buffer pool.
-	bufPool = &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, bufSize)
-		},
-	}
-
 	// websocket upgrader.
 	upgrader = websocket.Upgrader{
 		HandshakeTimeout: timeout,
@@ -83,8 +74,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go recive(conn, ws)
-	go send(ws, conn)
+	go util.WSToConn(conn, ws)
+	go util.ConnToWS(ws, conn)
 }
 
 func connectTarget(addr string, ch chan net.Conn) {
@@ -94,45 +85,4 @@ func connectTarget(addr string, ch chan net.Conn) {
 		return
 	}
 	ch <- conn
-}
-
-func recive(conn net.Conn, ws *websocket.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
-
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return
-		}
-
-		if n > 0 {
-			err = ws.WriteMessage(dataT, buf[:n])
-			if err != nil {
-				return
-			}
-		}
-	}
-}
-
-func send(ws *websocket.Conn, conn net.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	for {
-		msgT, data, err := ws.ReadMessage()
-
-		if msgT != dataT || err != nil {
-			return
-		}
-
-		_, err = conn.Write(data)
-
-		if err != nil {
-			return
-		}
-	}
 }

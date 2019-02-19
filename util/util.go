@@ -2,8 +2,10 @@ package util
 
 import (
 	"errors"
+	"github.com/gorilla/websocket"
 	"net"
 	"regexp"
+	"sync"
 )
 
 // IsDomain detect if value match the format of domain.
@@ -55,4 +57,52 @@ func Lookup(host string, ipv6 bool) (net.IP, error) {
 		return nil, errNoIPv4
 	}
 	return ip, err
+}
+
+// buffer pool.
+var bufPool = &sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 1024)
+	},
+}
+
+func WSToConn(conn net.Conn, ws *websocket.Conn) {
+	defer ws.Close()
+	defer conn.Close()
+
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+
+		if n > 0 {
+			err = ws.WriteMessage(websocket.BinaryMessage, buf[:n])
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func ConnToWS(ws *websocket.Conn, conn net.Conn) {
+	defer ws.Close()
+	defer conn.Close()
+
+	for {
+		msgT, data, err := ws.ReadMessage()
+
+		if msgT != websocket.BinaryMessage || err != nil {
+			return
+		}
+
+		_, err = conn.Write(data)
+
+		if err != nil {
+			return
+		}
+	}
 }

@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// transmission type
-	dataT = websocket.BinaryMessage
-
 	// connection time out
 	timeout = 10 * time.Second
 
@@ -26,13 +23,6 @@ const (
 )
 
 var (
-	// buffer pool.
-	bufPool = &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, bufSize)
-		},
-	}
-
 	// fake User-Agent.
 	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
 )
@@ -119,27 +109,22 @@ func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, looku
 	}
 	c.Header = reqHeader
 
-	// lookup.
-	var ip net.IP
-	if c.Lookup && util.IsDomain(c.Host) {
-		log.Println("lookup for server", c.Host, "ip address...")
-		ip, err = util.Lookup(c.Host, c.IPv6)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-
 	// get ws address.
 	var schema string
 	if secure {
 		schema = "wss://"
-	}
-	if !secure {
+	} else {
 		schema = "ws://"
 	}
-	if !lookup {
+	if !lookup || !util.IsDomain(c.Host) {
 		c.WSAddr = schema + c.Host + ":" + c.Port
 		return c
+	}
+	// lookup.
+	log.Println("lookup for server", c.Host, "ip address...")
+	ip, err := util.Lookup(c.Host, c.IPv6)
+	if err != nil {
+		log.Fatalln(err)
 	}
 	var ipstr string
 	if util.IsIPv4(ip) {
@@ -176,48 +161,7 @@ func (c *Client) Run() {
 			return
 		}
 
-		go send(conn, ws)
-		go recive(ws, conn)
+		go util.WSToConn(conn, ws)
+		go util.ConnToWS(ws, conn)
 	})
-}
-
-func send(conn net.Conn, ws *websocket.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
-
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return
-		}
-
-		if n > 0 {
-			err = ws.WriteMessage(dataT, buf[:n])
-			if err != nil {
-				return
-			}
-		}
-	}
-}
-
-func recive(ws *websocket.Conn, conn net.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	for {
-		msgT, data, err := ws.ReadMessage()
-
-		if msgT != dataT || err != nil {
-			return
-		}
-
-		_, err = conn.Write(data)
-
-		if err != nil {
-			return
-		}
-	}
 }
