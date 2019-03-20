@@ -7,7 +7,7 @@ Light-weight socks5 compatible proxy service kit using WebSocket.
 ## How it works?
 ![preview](https://raw.githubusercontent.com/SUCHMOKUO/falcon-ws/master/doc/images/falcon-ws.png)
 
-Falcon-WS use *Websocket* as it's transport layer protocal, So it can break some limitation set by the firewall (eg. only http/https). With the help of Websocket, you will be able to establish a full-duplex connection with the server through the firewall, and then you can access any service based on TCP on the internet. 
+Falcon-WS use *Websocket* as it's transport layer protocol, so it can break some limitation set by the firewall (eg. only http/https). With the help of websocket, you will be able to establish a full-duplex connection with the server through the firewall, and then you can access any service based on TCP on the internet. 
 
 ## Build
 
