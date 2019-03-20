@@ -1,5 +1,7 @@
 # Falcon-WS
 
+<img src="https://github.com/SUCHMOKUO/falcon-ws/raw/master/doc/images/icon.png"/>
+
 Light-weight socks5 compatible proxy service kit using WebSocket.
 
 *Notice: This project is just for study and fun.*
