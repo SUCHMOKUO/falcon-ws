@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/base64"
 	"errors"
-	"github.com/gorilla/websocket"
 	"io"
 	"net"
 	"regexp"
@@ -97,47 +96,6 @@ func Copy(dst io.WriteCloser, src io.ReadCloser) {
 				return
 			}
 		}
-		if err != nil {
-			return
-		}
-	}
-}
-
-func WSToConn(conn net.Conn, ws *websocket.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
-
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return
-		}
-
-		if n > 0 {
-			err = ws.WriteMessage(websocket.BinaryMessage, buf[:n])
-			if err != nil {
-				return
-			}
-		}
-	}
-}
-
-func ConnToWS(ws *websocket.Conn, conn net.Conn) {
-	defer ws.Close()
-	defer conn.Close()
-
-	for {
-		msgT, data, err := ws.ReadMessage()
-
-		if msgT != websocket.BinaryMessage || err != nil {
-			return
-		}
-
-		_, err = conn.Write(data)
-
 		if err != nil {
 			return
 		}

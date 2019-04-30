@@ -80,7 +80,7 @@ func handleReq(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	t := &tunnel.Tunnel{ *ws }
+	t := &tunnel.Tunnel{*ws}
 
 	conn := <-ch
 	if conn == nil {

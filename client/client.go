@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SUCHMOKUO/falcon-ws/tunnel"
 	"github.com/SUCHMOKUO/falcon-ws/socks5"
+	"github.com/SUCHMOKUO/falcon-ws/tunnel"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
 )
@@ -63,8 +63,8 @@ type Client struct {
 	config *Config
 
 	// extra server info.
-	host string
-	port string
+	host   string
+	port   string
 	wsAddr string
 
 	// http header
@@ -170,7 +170,7 @@ func (c *Client) CreateTunnel(targetHost, targetPort string) (io.ReadWriteCloser
 	if res.StatusCode == 404 {
 		return nil, errors.New("Empty target address or port.")
 	}
-	t := &tunnel.Tunnel{*ws }
+	t := &tunnel.Tunnel{*ws}
 	return t, nil
 }
 
