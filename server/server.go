@@ -1,7 +1,8 @@
 package server
 
 import (
-	"encoding/base64"
+	"errors"
+	"github.com/SUCHMOKUO/falcon-ws/tunnel"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
 	"log"
@@ -29,36 +30,48 @@ var (
 	}
 )
 
-// NewServer create a falcon-ws server.
-func NewServer(port string) {
-	http.HandleFunc("/free", handler)
+// ListenAndServe create a falcon-ws server.
+func ListenAndServe(port string) {
+	http.HandleFunc("/free", handleReq)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func getTarget(r *http.Request) (string, error) {
 	target := r.URL.Query()
-	hostEnc := target.Get("h")
-	portEnc := target.Get("p")
+	hostEncoded := target.Get("h")
+	portEncoded := target.Get("p")
 
-	if hostEnc == "" || portEnc == "" {
-		http.NotFound(w, r)
-		return
+	var hasErr = false
+	var host, port string
+	var err error
+
+	if hostEncoded == "" || portEncoded == "" {
+		hasErr = true
+	} else {
+		// decode url.
+		host, err = util.Decode(hostEncoded)
+		if err != nil {
+			hasErr = true
+		}
+		port, err = util.Decode(portEncoded)
+		if err != nil {
+			hasErr = true
+		}
 	}
 
-	// url decode.
-	hostS, err := base64.URLEncoding.DecodeString(hostEnc)
-	portS, err := base64.URLEncoding.DecodeString(portEnc)
+	if hasErr {
+		return "", errors.New("query params error")
+	}
+
+	return net.JoinHostPort(host, port), nil
+}
+
+func handleReq(w http.ResponseWriter, r *http.Request) {
+	addr, err := getTarget(r)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-
-	host := string(hostS)
-	port := string(portS)
-
-	// log.Println(host, port, r.Host)
-
-	addr := net.JoinHostPort(host, port)
 	ch := make(chan net.Conn, 1)
 	go connectTarget(addr, ch)
 
@@ -67,15 +80,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	t := &tunnel.Tunnel{ *ws }
 
 	conn := <-ch
 	if conn == nil {
-		ws.Close()
+		t.Close()
 		return
 	}
 
-	go util.WSToConn(conn, ws)
-	go util.ConnToWS(ws, conn)
+	go util.Copy(conn, t)
+	go util.Copy(t, conn)
 }
 
 func connectTarget(addr string, ch chan net.Conn) {

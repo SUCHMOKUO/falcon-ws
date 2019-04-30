@@ -1,12 +1,28 @@
 package util
 
 import (
+	"encoding/base64"
 	"errors"
 	"github.com/gorilla/websocket"
+	"io"
 	"net"
 	"regexp"
 	"sync"
 )
+
+// Encode string using base64.
+func Encode(str string) string {
+	return base64.URLEncoding.EncodeToString([]byte(str))
+}
+
+// Decode base64 string.
+func Decode(str string) (string, error) {
+	bytes, err := base64.URLEncoding.DecodeString(str)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
 
 // IsDomain detect if value match the format of domain.
 func IsDomain(host string) bool {
@@ -62,8 +78,29 @@ func Lookup(host string, ipv6 bool) (net.IP, error) {
 // buffer pool.
 var bufPool = &sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 1024)
+		return make([]byte, 1500)
 	},
+}
+
+func Copy(dst io.WriteCloser, src io.ReadCloser) {
+	defer dst.Close()
+	defer src.Close()
+
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			_, err := dst.Write(buf[:n])
+			if err != nil {
+				return
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
 func WSToConn(conn net.Conn, ws *websocket.Conn) {

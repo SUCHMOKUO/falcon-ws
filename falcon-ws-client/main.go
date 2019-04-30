@@ -7,13 +7,15 @@ import (
 )
 
 func main() {
-	var socks5Addr string
-	var serverAddr string
-	var fakeHost string
-	var userAgent string
-	var secure bool
-	var lookup bool
-	var ipv6 bool
+	var (
+		socks5Addr string
+		serverAddr string
+		fakeHost string
+		userAgent string
+		secure bool
+		lookup bool
+		ipv6 bool
+	)
 
 	flag.StringVar(&socks5Addr,
 		"l",
@@ -52,6 +54,13 @@ func main() {
 
 	flag.Parse()
 
-	falcon := client.NewClient(socks5Addr, serverAddr, fakeHost, userAgent, secure, lookup, ipv6)
-	falcon.Run()
+	client.New(&client.Config{
+		Socks5Addr: socks5Addr,
+		ServerAddr: serverAddr,
+		FakeHost: fakeHost,
+		UserAgent: userAgent,
+		Secure: secure,
+		Lookup: lookup,
+		IPv6: ipv6,
+	}).ListenAndServe()
 }

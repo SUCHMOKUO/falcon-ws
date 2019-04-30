@@ -2,13 +2,15 @@ package client
 
 import (
 	"crypto/tls"
-	"encoding/base64"
+	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/SUCHMOKUO/falcon-ws/tunnel"
 	"github.com/SUCHMOKUO/falcon-ws/socks5"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
@@ -27,15 +29,13 @@ var (
 	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
 )
 
-// Client
-type Client struct {
+// Config of client.
+type Config struct {
 	// local socks5 address for listening.
 	Socks5Addr string
 
-	// server info.
-	Host   string
-	Port   string
-	WSAddr string
+	// falcon server address. (host:port)
+	ServerAddr string
 
 	// fake 'Host' field in request header
 	// for against qos.
@@ -55,113 +55,141 @@ type Client struct {
 	// ipv6 flag. if it's true, the ipv6 address
 	// of proxy server will be used first.
 	IPv6 bool
-
-	// http header
-	Header http.Header
-
-	// websocket dialer.
-	Dialer websocket.Dialer
 }
 
-// NewClient return new falcon client instance.
-func NewClient(socks5addr, serveraddr, fakehost, useragent string, secure, lookup, ipv6 bool) *Client {
+// Client
+type Client struct {
+	// config
+	config *Config
+
+	// extra server info.
+	host string
+	port string
+	wsAddr string
+
+	// http header
+	header http.Header
+
+	// websocket dialer.
+	dialer websocket.Dialer
+}
+
+func (c *Client) completeHostAndPort() {
+	host, port, err := net.SplitHostPort(c.config.ServerAddr)
+	if err != nil {
+		log.Fatalln("server address format error!")
+	}
+	c.host = host
+	c.port = port
+}
+
+func (c *Client) completeWSAddr() {
+	// prepend schema.
+	var schema string
+	if c.config.Secure {
+		schema = "wss://"
+	} else {
+		schema = "ws://"
+	}
+
+	// lookup server ip.
+	if !util.IsDomain(c.host) || !c.config.Lookup {
+		c.wsAddr = schema + c.config.ServerAddr
+		return
+	}
+	log.Println("lookup for server", c.host)
+	ip, err := util.Lookup(c.host, c.config.IPv6)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var ipStr string
+	if util.IsIPv4(ip) {
+		ipStr = ip.String()
+	}
+	if util.IsIPv6(ip) {
+		ipStr = "[" + ip.String() + "]"
+	}
+	c.wsAddr = schema + ipStr + ":" + c.port
+}
+
+// init tls setting.
+func (c *Client) completeSecureSetting() {
+	if !c.config.Secure {
+		return
+	}
+	tlsCfg := new(tls.Config)
+	tlsCfg.ServerName = c.host
+	c.dialer.TLSClientConfig = tlsCfg
+}
+
+// init fake header.
+func (c *Client) completeHeader() {
+	reqHeader := http.Header{}
+	if c.config.FakeHost != "" && !c.config.Secure {
+		// add fake host field.
+		reqHeader.Set("Host", c.config.FakeHost)
+	} else {
+		reqHeader.Set("Host", c.host)
+	}
+	// fake user-agent field.
+	if c.config.UserAgent != "" {
+		reqHeader.Set("User-Agent", c.config.UserAgent)
+	} else {
+		reqHeader.Set("User-Agent", defaultUserAgent)
+	}
+	c.header = reqHeader
+}
+
+// New return new falcon client instance.
+func New(cfg *Config) *Client {
 	c := new(Client)
-	c.Socks5Addr = socks5addr
-	c.FakeHost = fakehost
-	c.UserAgent = useragent
-	c.Secure = secure
-	c.Lookup = lookup
-	c.IPv6 = ipv6
-	c.Dialer = websocket.Dialer{
+	c.config = cfg
+	c.dialer = websocket.Dialer{
 		HandshakeTimeout: timeout,
 		ReadBufferSize:   bufSize,
 		WriteBufferSize:  bufSize,
 		WriteBufferPool:  new(sync.Pool),
 	}
-
-	host, port, err := net.SplitHostPort(serveraddr)
-	if err != nil {
-		log.Fatalln("server address format error!")
-	}
-	c.Host = host
-	c.Port = port
-
-	// tls setting.
-	if c.Secure {
-		tlsCfg := new(tls.Config)
-		tlsCfg.ServerName = c.Host
-		c.Dialer.TLSClientConfig = tlsCfg
-	}
-
-	// init fake header.
-	reqHeader := http.Header{}
-	if c.FakeHost != "" && !c.Secure {
-		// add fake host field.
-		reqHeader.Set("Host", fakehost)
-	} else {
-		reqHeader.Set("Host", c.Host)
-	}
-	// fake user-agent field.
-	if c.UserAgent != "" {
-		reqHeader.Set("User-Agent", c.UserAgent)
-	} else {
-		reqHeader.Set("User-Agent", defaultUserAgent)
-	}
-	c.Header = reqHeader
-
-	// get ws address.
-	var schema string
-	if secure {
-		schema = "wss://"
-	} else {
-		schema = "ws://"
-	}
-	if !lookup || !util.IsDomain(c.Host) {
-		c.WSAddr = schema + c.Host + ":" + c.Port
-		return c
-	}
-	// lookup.
-	log.Println("lookup for server", c.Host, "ip address...")
-	ip, err := util.Lookup(c.Host, c.IPv6)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	var ipstr string
-	if util.IsIPv4(ip) {
-		ipstr = ip.String()
-	}
-	if util.IsIPv6(ip) {
-		ipstr = "[" + ip.String() + "]"
-	}
-	c.WSAddr = schema + ipstr + ":" + c.Port
+	c.completeHostAndPort()
+	c.completeWSAddr()
+	c.completeSecureSetting()
+	c.completeHeader()
 	return c
 }
 
-// Run falcon.
-func (c *Client) Run() {
-	log.Println("falcon server:", c.WSAddr)
-	log.Println("use host:", c.Header.Get("Host"))
-	log.Println("use user-agent:", c.Header.Get("User-Agent"))
+// CreateTunnel create a tunnel through falcon server to target.
+func (c *Client) CreateTunnel(targetHost, targetPort string) (io.ReadWriteCloser, error) {
+	// url encode.
+	host := util.Encode(targetHost)
+	port := util.Encode(targetPort)
+	url := c.wsAddr + "/free?h=" + host + "&p=" + port
+	ws, res, err := c.dialer.Dial(url, c.header)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode == 404 {
+		return nil, errors.New("Empty target address or port.")
+	}
+	t := &tunnel.Tunnel{*ws }
+	return t, nil
+}
+
+// ListenAndServe create a local socks5 server.
+func (c *Client) ListenAndServe() {
+	log.Println("falcon server:", c.wsAddr)
+	log.Println("use host:", c.header.Get("Host"))
+	log.Println("use user-agent:", c.header.Get("User-Agent"))
+
+	handleConn := func(conn net.Conn, target *socks5.Target) {
+		t, err := c.CreateTunnel(target.Host, target.Port)
+		if err != nil {
+			log.Println("dial proxy server error:", err)
+			return
+		}
+		go util.Copy(t, conn)
+		go util.Copy(conn, t)
+	}
 
 	// start socks5 server.
-	socks5.ListenAndServe(c.Socks5Addr, func(conn net.Conn, t *socks5.Target) {
-		// url encode.
-		host := base64.URLEncoding.EncodeToString([]byte(t.Host))
-		port := base64.URLEncoding.EncodeToString([]byte(t.Port))
-		url := c.WSAddr + "/free?h=" + host + "&p=" + port
-		ws, res, err := c.Dialer.Dial(url, c.Header)
-		if err != nil {
-			log.Println("Dial proxy server error:", err)
-			conn.Close()
-			return
-		}
-		if res.StatusCode == 404 {
-			log.Println("Empty target address or port.")
-			conn.Close()
-			return
-		}
-
-		go util.WSToConn(conn, ws)
-		go util.ConnToWS(ws, conn)
-	})
+	socks5.ListenAndServe(c.config.Socks5Addr, handleConn)
 }
