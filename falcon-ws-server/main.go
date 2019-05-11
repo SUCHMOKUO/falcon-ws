@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	port := flag.String("p", "80", "Listen port.")
+	addr := flag.String("l", ":80", "Listen address.")
 	flag.Parse()
-	log.Println("Server listening at", *port)
-	server.ListenAndServe(*port)
+	log.Println("Server listening at", *addr)
+	server.ListenAndServe(*addr)
 }
