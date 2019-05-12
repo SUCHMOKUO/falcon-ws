@@ -21,7 +21,7 @@ const (
 	timeout = 10 * time.Second
 
 	// buffer size.
-	bufSize = 1024
+	bufSize = 1500
 )
 
 var (
