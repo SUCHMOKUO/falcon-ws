@@ -28,6 +28,8 @@ var (
 		WriteBufferSize:  bufSize,
 		WriteBufferPool:  new(sync.Pool),
 	}
+
+	errQueryParams = errors.New("query params error")
 )
 
 func handleProxyReq(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +82,7 @@ func getTarget(r *http.Request) (string, error) {
 	}
 
 	if hasErr {
-		return "", errors.New("query params error")
+		return "", errQueryParams
 	}
 
 	return net.JoinHostPort(host, port), nil

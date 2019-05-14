@@ -184,6 +184,7 @@ func (c *Client) ListenAndServe() {
 		t, err := c.CreateTunnel(target.Host, target.Port)
 		if err != nil {
 			log.Println("dial proxy server error:", err)
+			_ = conn.Close()
 			return
 		}
 		go util.Copy(t, conn)
