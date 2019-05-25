@@ -80,7 +80,7 @@ func handleSocks5(socksConn net.Conn, p ProxyFunc) {
 		return
 	}
 	// start proxy.
-	go p(socksConn, target)
+	p(socksConn, target)
 }
 
 func socks5Handshake(conn net.Conn) (*Target, error) {

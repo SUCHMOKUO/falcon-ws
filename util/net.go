@@ -6,10 +6,11 @@ import (
 	"regexp"
 )
 
+var domainReg = regexp.MustCompile(`\.[a-z]{2,}$`)
+
 // IsDomain detect if value match the format of domain.
 func IsDomain(host string) bool {
-	ok, _ := regexp.MatchString(`\.[a-z]{2,}$`, host)
-	return ok
+	return domainReg.MatchString(host)
 }
 
 // IsIPv4 detect if ip is ipv4.
