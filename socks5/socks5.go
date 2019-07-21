@@ -2,18 +2,17 @@ package socks5
 
 import (
 	"errors"
+	"github.com/SUCHMOKUO/falcon-ws/util"
 	"log"
 	"net"
 	"strconv"
 	"sync"
-
-	"github.com/SUCHMOKUO/falcon-ws/util"
 )
 
 const (
-	ipv4   = 0x01
-	domain = 0x03
-	ipv6   = 0x04
+	IPV4   = 0x01
+	DOMAIN = 0x03
+	IPV6   = 0x04
 )
 
 var (
@@ -130,24 +129,24 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 	target.Port = strconv.Itoa(port)
 
 	switch buf[0] {
-	case ipv4:
+	case IPV4:
 		if l < 7 {
 			return nil, errInvalid
 		}
 		target.Host = net.IP(buf[1:5]).String()
 
-	case domain:
+	case DOMAIN:
 		domainLen := int(buf[1])
 		if l < 4+domainLen {
 			return nil, errInvalid
 		}
 		host := string(buf[2 : domainLen+2])
-		if !util.IsDomain(host) {
+		if !util.IsValidHost(host) {
 			return nil, errInvalid
 		}
 		target.Host = host
 
-	case ipv6:
+	case IPV6:
 		if l < 19 {
 			return nil, errInvalid
 		}

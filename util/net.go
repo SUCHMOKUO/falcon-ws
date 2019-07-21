@@ -23,6 +23,15 @@ func IsIPv6(ip net.IP) bool {
 	return ip != nil && ip.To4() == nil
 }
 
+// IsValidHost detect if host is valid.
+func IsValidHost(str string) bool {
+	ip := net.ParseIP(str)
+	if ip != nil {
+		return true
+	}
+	return IsDomain(str)
+}
+
 type detector = func(net.IP) bool
 
 // findIP returns the first ip matched detector.
