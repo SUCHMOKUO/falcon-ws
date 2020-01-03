@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"sync"
 )
 
 const (
@@ -31,16 +30,9 @@ var (
 		0x10, 0x10,
 	}
 
-	// buffer pool.
-	bufPool = &sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 257)
-		},
-	}
-
 	// errors.
-	errInvalid   = errors.New("Invalid target info")
-	errNotSocks5 = errors.New("Not Socks5")
+	errInvalid   = errors.New("invalid target info")
+	errNotSocks5 = errors.New("not socks5")
 )
 
 // Target target server info.
@@ -57,10 +49,10 @@ type ProxyFunc = func(net.Conn, *Target)
 func ListenAndServe(socks5Addr string, p ProxyFunc) {
 	l, err := net.Listen("tcp", socks5Addr)
 	if err != nil {
-		log.Fatalln("Socks5 服务器监听失败，地址有误或端口被占用？")
+		log.Fatalln("[Socks5] 服务器监听失败，地址有误或端口被占用？")
 	}
 
-	log.Println("Socks5 server listening at", socks5Addr)
+	log.Println("[Socks5] server listening at", socks5Addr)
 
 	for {
 		conn, err := l.Accept()
@@ -75,7 +67,7 @@ func handleSocks5(socksConn net.Conn, p ProxyFunc) {
 	target, err := socks5Handshake(socksConn)
 	if err != nil {
 		socksConn.Close()
-		log.Println("Socks5 handshake error:", err)
+		log.Println("[Socks5] handshake error:", err)
 		return
 	}
 	// start proxy.
@@ -83,8 +75,7 @@ func handleSocks5(socksConn net.Conn, p ProxyFunc) {
 }
 
 func socks5Handshake(conn net.Conn) (*Target, error) {
-	buf := bufPool.Get().([]byte)
-	defer bufPool.Put(buf)
+	buf := make([]byte, 257)
 
 	// consult.
 	_, err := conn.Read(buf)
@@ -118,29 +109,27 @@ func socks5Handshake(conn net.Conn) (*Target, error) {
 		return nil, err
 	}
 
-	return parseTargetInfo(buf[3:n])
-}
-
-func parseTargetInfo(buf []byte) (*Target, error) {
+	// parse target info.
+	info := buf[3:n]
 	target := new(Target)
 
-	l := len(buf)
-	port := int(buf[l-2])<<8 | int(buf[l-1])
+	l := len(info)
+	port := int(info[l-2])<<8 | int(info[l-1])
 	target.Port = strconv.Itoa(port)
 
-	switch buf[0] {
+	switch info[0] {
 	case IPV4:
 		if l < 7 {
 			return nil, errInvalid
 		}
-		target.Host = net.IP(buf[1:5]).String()
+		target.Host = net.IP(info[1:5]).String()
 
 	case DOMAIN:
-		domainLen := int(buf[1])
+		domainLen := int(info[1])
 		if l < 4+domainLen {
 			return nil, errInvalid
 		}
-		host := string(buf[2 : domainLen+2])
+		host := string(info[2 : domainLen+2])
 		if !util.IsValidHost(host) {
 			return nil, errInvalid
 		}
@@ -150,7 +139,7 @@ func parseTargetInfo(buf []byte) (*Target, error) {
 		if l < 19 {
 			return nil, errInvalid
 		}
-		target.Host = net.IP(buf[1:17]).String()
+		target.Host = net.IP(info[1:17]).String()
 
 	default:
 		return nil, errInvalid

@@ -8,39 +8,29 @@ import (
 
 func main() {
 	var (
-		socks5Addr string
-		serverAddr string
-		fakeHost string
-		userAgent string
-		secure bool
-		lookup bool
-		ipv6 bool
+		socks5Addr    string
+		serverHost    string
+		serverPort    string
+		lookup        bool
+		ipv6          bool
+		password      string
+		connGroupSize int
 	)
 
 	flag.StringVar(&socks5Addr,
-		"l",
+		"socks5",
 		"127.0.0.1:6666",
 		"Local socks5 server address.")
 
-	flag.StringVar(&serverAddr,
-		"r",
-		"127.0.0.1:80",
-		"Falcon-WS server address.")
+	flag.StringVar(&serverHost,
+		"host",
+		"localhost",
+		"Falcon-WS server host.")
 
-	flag.StringVar(&fakeHost,
-		"fh",
-		"",
-		"Fake 'Host' field for request header.")
-
-	flag.StringVar(&userAgent,
-		"ua",
-		"",
-		"Fake 'User-Agent' field for request header.")
-
-	flag.BoolVar(&secure,
-		"secure",
-		false,
-		"Secure flag for enable https.")
+	flag.StringVar(&serverPort,
+		"port",
+		"443",
+		"Falcon-WS server port.")
 
 	flag.BoolVar(&lookup,
 		"lookup",
@@ -52,15 +42,25 @@ func main() {
 		false,
 		"Flag for enable ipv6. if sets to 'true', it will use ipv6 address (if it has) of proxy server first.")
 
+	flag.StringVar(&password,
+		"password",
+		"password",
+		"Password of proxy service.")
+
+	flag.IntVar(&connGroupSize,
+		"conngroup-size",
+		5,
+		"Size of connection group.")
+
 	flag.Parse()
 
 	client.New(&client.Config{
-		Socks5Addr: socks5Addr,
-		ServerAddr: serverAddr,
-		FakeHost: fakeHost,
-		UserAgent: userAgent,
-		Secure: secure,
-		Lookup: lookup,
-		IPv6: ipv6,
+		Socks5Addr:    socks5Addr,
+		ServerHost:    serverHost,
+		ServerPort:    serverPort,
+		Lookup:        lookup,
+		IPv6:          ipv6,
+		Password:      password,
+		ConnGroupSize: connGroupSize,
 	}).ListenAndServe()
 }

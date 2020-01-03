@@ -6,8 +6,18 @@ import (
 )
 
 // ListenAndServe create a falcon-ws server.
-func ListenAndServe(addr string) {
-	http.HandleFunc("/free", handleProxyReq)
-	http.HandleFunc("/location", handleLocationReq)
-	log.Fatal(http.ListenAndServe(addr, nil))
+func ListenAndServe(config *Config) {
+	globalConfig = config
+
+	loginHandler := new(HttpHandler)
+	loginHandler.Use(login)
+	http.HandleFunc("/login", loginHandler.GetHandleFunc())
+
+	proxyHandler := new(HttpHandler)
+	proxyHandler.Use(auth)
+	proxyHandler.Use(wsUpgrader)
+	proxyHandler.Use(sessionManager)
+	http.HandleFunc("/free", proxyHandler.GetHandleFunc())
+
+	log.Fatalln(http.ListenAndServeTLS(config.Addr, config.Cert, config.PrivateKey, nil))
 }

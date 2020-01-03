@@ -2,16 +2,19 @@ package client
 
 import (
 	"crypto/tls"
-	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
+	"github.com/SUCHMOKUO/falcon-ws/messageconn"
+	"github.com/SUCHMOKUO/falcon-ws/mux"
+	"github.com/SUCHMOKUO/falcon-ws/mux/conngroup"
 	"github.com/SUCHMOKUO/falcon-ws/socks5"
-	"github.com/SUCHMOKUO/falcon-ws/tunnel"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
 )
@@ -20,42 +23,8 @@ const (
 	// connection time out
 	timeout = 10 * time.Second
 
-	// buffer size.
-	bufSize = 1500
+	bufSize = 4096
 )
-
-var (
-	// fake User-Agent.
-	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML"
-)
-
-// Config of client.
-type Config struct {
-	// local socks5 address for listening.
-	Socks5Addr string
-
-	// falcon server address. (host:port)
-	ServerAddr string
-
-	// fake 'Host' field in request header
-	// for against qos.
-	FakeHost string
-
-	// fake User-Agent.
-	UserAgent string
-
-	// secure flag. true for using https
-	// instead of http.
-	Secure bool
-
-	// lookup flag. if it's false, client will
-	// not lookup the server ip and cache it.
-	Lookup bool
-
-	// ipv6 flag. if it's true, the ipv6 address
-	// of proxy server will be used first.
-	IPv6 bool
-}
 
 // Client
 type Client struct {
@@ -63,42 +32,84 @@ type Client struct {
 	config *Config
 
 	// extra server info.
-	host   string
-	port   string
-	wsAddr string
+	wsUrl    string
+	httpsUrl string
 
-	// http header
+	// http header for create ws connection.
 	header http.Header
 
 	// websocket dialer.
 	dialer websocket.Dialer
+
+	m *mux.Mux
 }
 
-func (c *Client) completeHostAndPort() {
-	host, port, err := net.SplitHostPort(c.config.ServerAddr)
+// NewWSConn return new falcon client instance.
+func New(cfg *Config) *Client {
+	c := new(Client)
+	c.config = cfg
+	c.dialer = websocket.Dialer{
+		HandshakeTimeout: timeout,
+		ReadBufferSize:   bufSize,
+		WriteBufferSize:  bufSize,
+		WriteBufferPool: &sync.Pool{
+			New: func() interface{} {
+				return make([]byte, bufSize)
+			},
+		},
+		TLSClientConfig: &tls.Config{
+			ServerName: cfg.ServerHost,
+		},
+	}
+	c.header = http.Header{}
+	c.completeUrl()
+	c.login()
+	c.createConnGroup()
+	return c
+}
+
+// CreateProxyConn create a proxy connection through falcon server to target.
+func (c *Client) CreateProxyConn(targetHost, targetPort string) (io.ReadWriteCloser, error) {
+	targetUrl := util.EncodeBase64(targetHost + ":" + targetPort)
+	s, err := c.m.NewStream()
 	if err != nil {
-		log.Fatalln("server address format error!")
+		log.Fatalln("[Client]", err)
 	}
-	c.host = host
-	c.port = port
+	_, err = s.Write([]byte(targetUrl))
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
-func (c *Client) completeWSAddr() {
-	// prepend schema.
-	var schema string
-	if c.config.Secure {
-		schema = "wss://"
-	} else {
-		schema = "ws://"
+// ListenAndServe create a local socks5 server.
+func (c *Client) ListenAndServe() {
+	log.Println("[Client] falcon server:", c.wsUrl)
+
+	handleConn := func(conn net.Conn, target *socks5.Target) {
+		t, err := c.CreateProxyConn(target.Host, target.Port)
+		if err != nil {
+			log.Println("[Create Conn]", err)
+			conn.Close()
+			return
+		}
+		go util.CopyIO(t, conn)
+		go util.CopyIO(conn, t)
 	}
 
+	// start socks5 server.
+	socks5.ListenAndServe(c.config.Socks5Addr, handleConn)
+}
+
+func (c *Client) completeUrl() {
+	c.httpsUrl = "https://" + c.config.ServerHost + ":" + c.config.ServerPort
 	// lookup server ip.
-	if !util.IsDomain(c.host) || !c.config.Lookup {
-		c.wsAddr = schema + c.config.ServerAddr
+	if !util.IsDomain(c.config.ServerHost) || !c.config.Lookup {
+		c.wsUrl = "wss://" + c.config.ServerHost + ":" + c.config.ServerPort
 		return
 	}
-	log.Println("lookup for server", c.host)
-	ip, err := util.Lookup(c.host, c.config.IPv6)
+	log.Println("[Client] lookup for server:", c.config.ServerHost)
+	ip, err := util.Lookup(c.config.ServerHost, c.config.IPv6)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -109,88 +120,45 @@ func (c *Client) completeWSAddr() {
 	if util.IsIPv6(ip) {
 		ipStr = "[" + ip.String() + "]"
 	}
-	c.wsAddr = schema + ipStr + ":" + c.port
+	c.wsUrl = "wss://" + ipStr + ":" + c.config.ServerPort
 }
 
-// init tls setting.
-func (c *Client) completeSecureSetting() {
-	if !c.config.Secure {
-		return
-	}
-	tlsCfg := new(tls.Config)
-	tlsCfg.ServerName = c.host
-	c.dialer.TLSClientConfig = tlsCfg
-}
-
-// init fake header.
-func (c *Client) completeHeader() {
-	reqHeader := http.Header{}
-	if c.config.FakeHost != "" && !c.config.Secure {
-		// add fake host field.
-		reqHeader.Set("Host", c.config.FakeHost)
-	} else {
-		reqHeader.Set("Host", c.host)
-	}
-	// fake user-agent field.
-	if c.config.UserAgent != "" {
-		reqHeader.Set("User-Agent", c.config.UserAgent)
-	} else {
-		reqHeader.Set("User-Agent", defaultUserAgent)
-	}
-	c.header = reqHeader
-}
-
-// New return new falcon client instance.
-func New(cfg *Config) *Client {
-	c := new(Client)
-	c.config = cfg
-	c.dialer = websocket.Dialer{
-		HandshakeTimeout: timeout,
-		ReadBufferSize:   bufSize,
-		WriteBufferSize:  bufSize,
-		WriteBufferPool:  new(sync.Pool),
-	}
-	c.completeHostAndPort()
-	c.completeWSAddr()
-	c.completeSecureSetting()
-	c.completeHeader()
-	return c
-}
-
-// CreateTunnel create a tunnel through falcon server to target.
-func (c *Client) CreateTunnel(targetHost, targetPort string) (io.ReadWriteCloser, error) {
-	// url encode.
-	host := util.Encode(targetHost)
-	port := util.Encode(targetPort)
-	url := c.wsAddr + "/free?h=" + host + "&p=" + port
-	ws, res, err := c.dialer.Dial(url, c.header)
+func (c *Client) login() {
+	form := url.Values{}
+	form.Set("password", c.config.Password)
+	resp, err := http.PostForm(c.httpsUrl+"/login", form)
 	if err != nil {
-		return nil, err
+		log.Fatalln("[Login]", err)
 	}
-	if res.StatusCode == 404 {
-		return nil, errors.New("Empty target address or port.")
+
+	token, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln("[Login]", err)
 	}
-	t := &tunnel.Tunnel{*ws}
-	return t, nil
+	defer resp.Body.Close()
+
+	tokenStr := string(token)
+	c.header.Set("Authorization", "Bearer "+tokenStr)
+	log.Println("[Login] Succeed")
 }
 
-// ListenAndServe create a local socks5 server.
-func (c *Client) ListenAndServe() {
-	log.Println("falcon server:", c.wsAddr)
-	log.Println("use host:", c.header.Get("Host"))
-	log.Println("use user-agent:", c.header.Get("User-Agent"))
-
-	handleConn := func(conn net.Conn, target *socks5.Target) {
-		t, err := c.CreateTunnel(target.Host, target.Port)
-		if err != nil {
-			log.Println("dial proxy server error:", err)
-			_ = conn.Close()
-			return
-		}
-		go util.Copy(t, conn)
-		go util.Copy(conn, t)
-	}
-
-	// start socks5 server.
-	socks5.ListenAndServe(c.config.Socks5Addr, handleConn)
+func (c *Client) createConnGroup() {
+	cg := conngroup.New(&conngroup.Config{
+		Size: c.config.ConnGroupSize,
+		GenConn: func() (messageconn.Conn, error) {
+			ws, res, wsErr := c.dialer.Dial(c.wsUrl+"/free", c.header)
+			if wsErr != nil {
+				return nil, wsErr
+			}
+			code := res.StatusCode
+			msg, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				return nil, err
+			}
+			defer res.Body.Close()
+			log.Println("[Creating Connection Group]", code, string(msg))
+			return messageconn.NewWSConn(ws), nil
+		},
+	})
+	c.m = mux.New(cg)
 }
