@@ -2,8 +2,6 @@ package messageconn
 
 import "github.com/gorilla/websocket"
 
-const dataT = websocket.BinaryMessage
-
 // Conn is a message-based connection interface.
 type Conn interface {
 	ReadMessage() (msg []byte, err error)
@@ -28,7 +26,7 @@ func (t *WSConn) ReadMessage() ([]byte, error) {
 }
 
 func (t *WSConn) WriteMessage(p []byte) error {
-	return t.conn.WriteMessage(dataT, p)
+	return t.conn.WriteMessage(websocket.BinaryMessage, p)
 }
 
 func (t *WSConn) Close() error {

@@ -2,8 +2,9 @@ package stream
 
 import (
 	"errors"
-	"github.com/SUCHMOKUO/falcon-ws/util"
 	"io"
+
+	"github.com/SUCHMOKUO/falcon-ws/util"
 )
 
 const (
@@ -30,7 +31,7 @@ type Stream struct {
 	// used for reading unordered frames.
 	receiveChan chan *Frame
 
-	// used for reading reordered frames.
+	// used for reading ordered frame.
 	readChan chan *Frame
 
 	// used for sending frames.
@@ -115,9 +116,6 @@ func (s *Stream) PutFrame(f *Frame) {
 }
 
 func (s *Stream) GetFrame() (*Frame, error) {
-	if s.writeClosed {
-		return nil, errStreamClosed
-	}
 	f, ok := <-s.sendChan
 	if !ok {
 		return nil, errStreamClosed

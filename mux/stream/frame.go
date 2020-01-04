@@ -20,12 +20,8 @@ type Frame struct {
 func (f *Frame) Serialize() []byte {
 	buf := make([]byte, len(f.Data) + 7)
 	buf[0] = f.Ctl
-	buf[1] = byte(f.StreamId >> 24)
-	buf[2] = byte(f.StreamId >> 16)
-	buf[3] = byte(f.StreamId >> 8)
-	buf[4] = byte(f.StreamId)
-	buf[5] = byte(f.Seq >> 8)
-	buf[6] = byte(f.Seq)
+	binary.BigEndian.PutUint32(buf[1:5], f.StreamId)
+	binary.BigEndian.PutUint16(buf[5:7], f.Seq)
 	copy(buf[7:], f.Data)
 	return buf
 }

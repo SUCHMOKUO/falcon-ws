@@ -7,15 +7,11 @@ import (
 	"strconv"
 )
 
-func RandomUint64() uint64 {
-	res, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
-	return res.Uint64()
-}
-
 func RandomUint32() uint32 {
-	return uint32(RandomUint64())
+	res, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
+	return uint32(res.Uint64())
 }
 
-func RandomUintString() string {
-	return strconv.FormatUint(RandomUint64(), 10)
+func RandomUint32String() string {
+	return strconv.FormatUint(uint64(RandomUint32()), 10)
 }

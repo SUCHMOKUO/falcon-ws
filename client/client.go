@@ -70,12 +70,11 @@ func New(cfg *Config) *Client {
 
 // CreateProxyConn create a proxy connection through falcon server to target.
 func (c *Client) CreateProxyConn(targetHost, targetPort string) (io.ReadWriteCloser, error) {
-	targetUrl := util.EncodeBase64(targetHost + ":" + targetPort)
 	s, err := c.m.NewStream()
 	if err != nil {
 		log.Fatalln("[Client]", err)
 	}
-	_, err = s.Write([]byte(targetUrl))
+	_, err = s.Write([]byte(targetHost + ":" + targetPort))
 	if err != nil {
 		return nil, err
 	}

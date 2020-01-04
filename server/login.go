@@ -28,7 +28,7 @@ func login(ctx *Ctx) (err error, code int) {
 
 func newToken() string {
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id": util.RandomUintString(),
+		"id": util.RandomUint32String(),
 	}).SignedString([]byte(globalConfig.SignatureKey))
 	if err != nil {
 		log.Fatalln("[JWT Signature]", err)

@@ -1,27 +1,22 @@
 package stream
 
 import (
+	"bytes"
+	"io/ioutil"
 	"testing"
 )
 
 func TestStream_Read(t *testing.T) {
-	var id ID = 123
+	var id uint32 = 123
 	s := New(id)
 	done := make(chan bool)
 	go func() {
-		buf := make([]byte, 1024)
-		var curData byte = 0
-		for {
-			n, err := s.Read(buf)
-			if n > 0 {
-				if curData != buf[0] {
-					t.Error("current data should be", curData)
-				}
-				curData++
-			}
-			if err != nil {
-				break
-			}
+		res, err := ioutil.ReadAll(s)
+		if err != nil {
+			t.Error(err)
+		}
+		if !bytes.Equal(res, []byte{0,1,2,3,4}) {
+			t.Error(res)
 		}
 		done <- true
 	}()
@@ -73,7 +68,10 @@ func TestStream_Write(t *testing.T) {
 
 	go func() {
 		for {
-			f := DeserializeFrame(w.GetFrame())
+			f, err := w.GetFrame()
+			if err != nil {
+				t.Error(err)
+			}
 			r.PutFrame(f)
 			if f.Ctl == FIN {
 				break

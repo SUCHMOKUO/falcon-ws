@@ -12,18 +12,14 @@ import (
 const dialTimeout = 10 * time.Second
 
 func proxy(s *stream.Stream) {
-	buf := make([]byte, 512)
+	buf := make([]byte, 260)
 	n, err := s.Read(buf)
 	if err != nil {
 		s.Close()
 		return
 	}
 
-	addr, err := util.DecodeBase64(string(buf[:n]))
-	if err != nil {
-		s.Close()
-		return
-	}
+	addr := string(buf[:n])
 
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
