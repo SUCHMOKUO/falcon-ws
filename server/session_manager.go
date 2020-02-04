@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 	"sync"
+
+	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 )
 
 var (

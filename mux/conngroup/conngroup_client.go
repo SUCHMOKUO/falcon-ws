@@ -4,10 +4,11 @@ package conngroup
 
 import (
 	"context"
-	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 )
 
 var (

@@ -2,9 +2,10 @@ package conngroup
 
 import (
 	"context"
+	"io"
+
 	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 	"github.com/SUCHMOKUO/falcon-ws/util"
-	"io"
 )
 
 const (

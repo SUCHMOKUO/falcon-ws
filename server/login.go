@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/SUCHMOKUO/falcon-ws/util"
+	"github.com/dgrijalva/jwt-go"
 )
 
 var (

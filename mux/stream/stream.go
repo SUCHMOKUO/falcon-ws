@@ -3,6 +3,7 @@ package stream
 import (
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/SUCHMOKUO/falcon-ws/util"
 )
@@ -16,6 +17,34 @@ var (
 	errStreamClosed        = errors.New("stream closed")
 )
 
+type readFrameBuffer [1<<16]*Frame
+
+type readFrameBufferPool struct {
+	sync.Pool
+}
+
+func (p *readFrameBufferPool) put(buf *readFrameBuffer) {
+	// reset to nil.
+	for i := range buf {
+		buf[i] = nil
+	}
+	p.Pool.Put(buf)
+}
+
+func (p *readFrameBufferPool) get() *readFrameBuffer {
+	return p.Pool.Get().(*readFrameBuffer)
+}
+
+var (
+	readFrameBufPool = &readFrameBufferPool{
+		Pool: sync.Pool{
+			New: func() interface{} {
+				return new(readFrameBuffer)
+			},
+		},
+	}
+)
+
 // Stream is a abstract connection beyond the connection group.
 // Stream is NOT concurrency-safe.
 type Stream struct {
@@ -26,7 +55,7 @@ type Stream struct {
 	nextWriteSeq uint16
 
 	// used for caching read frames that out of order.
-	readFrameBuf map[uint16]*Frame
+	readFrameBuf *readFrameBuffer
 
 	// used for reading unordered frames.
 	receiveChan chan *Frame
@@ -44,7 +73,7 @@ type Stream struct {
 func New(id uint32) *Stream {
 	s := new(Stream)
 	s.Id = id
-	s.readFrameBuf = make(map[uint16]*Frame, chanBufSize)
+	s.readFrameBuf = readFrameBufPool.get()
 	s.readChan = make(chan *Frame, chanBufSize)
 	s.receiveChan = make(chan *Frame, chanBufSize)
 	s.sendChan = make(chan *Frame, chanBufSize)
@@ -147,6 +176,7 @@ func (s *Stream) clear() {
 	close(s.sendChan)
 	close(s.readChan)
 	close(s.receiveChan)
+	readFrameBufPool.put(s.readFrameBuf)
 	if s.OnFullClose != nil {
 		s.OnFullClose(s)
 	}
@@ -160,11 +190,11 @@ func (s *Stream) receivedFrameSorter() {
 		}
 		s.readFrameBuf[f.Seq] = f
 		for {
-			nextFrame, exist := s.readFrameBuf[s.nextReadSeq]
-			if !exist {
+			nextFrame := s.readFrameBuf[s.nextReadSeq]
+			if nextFrame == nil {
 				break
 			}
-			delete(s.readFrameBuf, s.nextReadSeq)
+			s.readFrameBuf[s.nextReadSeq] = nil
 			s.nextReadSeq++
 			s.readChan <- nextFrame
 		}

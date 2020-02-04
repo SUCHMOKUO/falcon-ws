@@ -3,10 +3,12 @@ package stream
 import (
 	"bytes"
 	"io/ioutil"
+	"math/rand"
 	"testing"
+	"time"
 )
 
-func TestStream_Read(t *testing.T) {
+func TestRead(t *testing.T) {
 	var id uint32 = 123
 	s := New(id)
 	done := make(chan bool)
@@ -61,7 +63,7 @@ func TestStream_Read(t *testing.T) {
 	<-done
 }
 
-func TestStream_Write(t *testing.T) {
+func TestWrite(t *testing.T) {
 	w := New(1)
 	r := New(1)
 	done := make(chan bool)
@@ -102,4 +104,98 @@ func TestStream_Write(t *testing.T) {
 	}
 
 	<-done
+}
+
+func BenchmarkFrameSortMap(b *testing.B) {
+	buf := make(map[uint16]*Frame, chanBufSize)
+	frames := make([]*Frame, 10000)
+	for i, _ := range frames {
+		frames[i] = &Frame{ Seq: uint16(i) }
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(frames), func(i, j int) {
+		frames[i], frames[j] = frames[j], frames[i]
+	})
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var nextReadSeq uint16 = 0
+		for _, f := range frames {
+			buf[f.Seq] = f
+			for {
+				_, exist := buf[nextReadSeq]
+				if !exist {
+					break
+				}
+				delete(buf, nextReadSeq)
+				nextReadSeq++
+			}
+		}
+	}
+}
+
+func BenchmarkFrameSortArray(b *testing.B) {
+	var buf [1<<16]*Frame
+	frames := make([]*Frame, 10000)
+	for i, _ := range frames {
+		frames[i] = &Frame{ Seq: uint16(i) }
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(frames), func(i, j int) {
+		frames[i], frames[j] = frames[j], frames[i]
+	})
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var nextReadSeq uint16 = 0
+		for _, f := range frames {
+			buf[f.Seq] = f
+			for {
+				nextFrame := buf[nextReadSeq]
+				if nextFrame == nil {
+					break
+				}
+				buf[nextReadSeq] = nil
+				nextReadSeq++
+			}
+		}
+	}
+}
+
+func BenchmarkResetBufLoop(b *testing.B) {
+	var buf readFrameBuffer
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for j := range buf {
+			buf[j] = nil
+		}
+	}
+}
+
+func BenchmarkResetBufCopy(b *testing.B) {
+	var template readFrameBuffer
+	var buf readFrameBuffer
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		copy(buf[:], template[:])
+	}
+}
+
+func BenchmarkResetBufRepeatCopy(b *testing.B) {
+	var buf readFrameBuffer
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		buf[0] = nil
+		for bp := 1; bp < 1<<16; bp *= 2 {
+			copy(buf[bp:], buf[:bp])
+		}
+	}
 }

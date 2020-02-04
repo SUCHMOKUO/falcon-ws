@@ -2,18 +2,11 @@ package util
 
 import (
 	"io"
-	"sync"
 )
 
-var copyIOBufPool = &sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 65536)
-	},
-}
-
 func CopyIO(dst io.WriteCloser, src io.ReadCloser) {
-	buf := copyIOBufPool.Get().([]byte)
-	defer copyIOBufPool.Put(buf)
+	var bufArr [10240]byte
+	buf := bufArr[:]
 
 	for {
 		n, err := src.Read(buf)

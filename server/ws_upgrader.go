@@ -31,7 +31,7 @@ var (
 	errUpgradeFail = errors.New("ws upgrade fail")
 )
 
-func wsUpgrader(ctx *Ctx) (err error, code int) {
+func wsUpgrade(ctx *Ctx) (err error, code int) {
 	ws, err := upgrader.Upgrade(ctx.w, ctx.r, nil)
 	if err != nil {
 		return errUpgradeFail, http.StatusBadRequest

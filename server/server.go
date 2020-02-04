@@ -15,7 +15,7 @@ func ListenAndServe(config *Config) {
 
 	proxyHandler := new(HttpHandler)
 	proxyHandler.Use(auth)
-	proxyHandler.Use(wsUpgrader)
+	proxyHandler.Use(wsUpgrade)
 	proxyHandler.Use(sessionManager)
 	http.HandleFunc("/free", proxyHandler.GetHandleFunc())
 

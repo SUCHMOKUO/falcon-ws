@@ -23,7 +23,7 @@ const (
 	// connection time out
 	timeout = 10 * time.Second
 
-	bufSize = 4096
+	bufSize = 10300
 )
 
 // Client
@@ -69,12 +69,12 @@ func New(cfg *Config) *Client {
 }
 
 // CreateProxyConn create a proxy connection through falcon server to target.
-func (c *Client) CreateProxyConn(targetHost, targetPort string) (io.ReadWriteCloser, error) {
+func (c *Client) CreateProxyConn(targetAddr string) (io.ReadWriteCloser, error) {
 	s, err := c.m.NewStream()
 	if err != nil {
 		log.Fatalln("[Client]", err)
 	}
-	_, err = s.Write([]byte(targetHost + ":" + targetPort))
+	_, err = s.Write([]byte(targetAddr))
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +85,8 @@ func (c *Client) CreateProxyConn(targetHost, targetPort string) (io.ReadWriteClo
 func (c *Client) ListenAndServe() {
 	log.Println("[Client] falcon server:", c.wsUrl)
 
-	handleConn := func(conn net.Conn, target *socks5.Target) {
-		t, err := c.CreateProxyConn(target.Host, target.Port)
+	handleConn := func(conn net.Conn, targetAddr string) {
+		t, err := c.CreateProxyConn(targetAddr)
 		if err != nil {
 			log.Println("[Create Conn]", err)
 			conn.Close()

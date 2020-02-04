@@ -13,6 +13,10 @@ func init() {
 	if err != nil {
 		log.Fatalln("get current path error:", err)
 	}
+	exePath, err = filepath.EvalSymlinks(exePath)
+	if err != nil {
+		log.Fatalln("get current path error:", err)
+	}
 	currentPath = filepath.Dir(exePath)
 }
 

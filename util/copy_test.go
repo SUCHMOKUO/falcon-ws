@@ -57,3 +57,28 @@ func TestCopyBuf(t *testing.T) {
 		t.Error("copy error")
 	}
 }
+
+const testAllocSize = 65536
+
+func allocHeap() {
+	buf := make([]byte, testAllocSize)
+	_ = len(buf)
+}
+
+func allocStack() {
+	var bufArr [testAllocSize]byte
+	buf := bufArr[:]
+	_ = len(buf)
+}
+
+func BenchmarkAllocateHeap(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		allocHeap()
+	}
+}
+
+func BenchmarkAllocateStack(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		allocStack()
+	}
+}
