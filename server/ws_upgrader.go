@@ -12,7 +12,7 @@ import (
 
 const (
 	wsTimeout = 10 * time.Second
-	wsBufSize = 4096
+	wsBufSize = 10300
 )
 
 var (

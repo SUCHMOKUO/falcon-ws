@@ -163,39 +163,3 @@ func BenchmarkFrameSortArray(b *testing.B) {
 		}
 	}
 }
-
-func BenchmarkResetBufLoop(b *testing.B) {
-	var buf readFrameBuffer
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		for j := range buf {
-			buf[j] = nil
-		}
-	}
-}
-
-func BenchmarkResetBufCopy(b *testing.B) {
-	var template readFrameBuffer
-	var buf readFrameBuffer
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		copy(buf[:], template[:])
-	}
-}
-
-func BenchmarkResetBufRepeatCopy(b *testing.B) {
-	var buf readFrameBuffer
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		buf[0] = nil
-		for bp := 1; bp < 1<<16; bp *= 2 {
-			copy(buf[bp:], buf[:bp])
-		}
-	}
-}

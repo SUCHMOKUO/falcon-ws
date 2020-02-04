@@ -62,13 +62,13 @@ const testAllocSize = 65536
 
 func allocHeap() {
 	buf := make([]byte, testAllocSize)
-	_ = len(buf)
+	buf[testAllocSize-1] = 1
 }
 
 func allocStack() {
 	var bufArr [testAllocSize]byte
 	buf := bufArr[:]
-	_ = len(buf)
+	buf[testAllocSize-1] = 1
 }
 
 func BenchmarkAllocateHeap(b *testing.B) {
