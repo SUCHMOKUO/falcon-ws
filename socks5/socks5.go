@@ -3,9 +3,10 @@ package socks5
 import (
 	"errors"
 	"fmt"
-	"github.com/SUCHMOKUO/falcon-ws/util"
 	"log"
 	"net"
+
+	"github.com/SUCHMOKUO/falcon-ws/util"
 )
 
 const (
@@ -111,35 +112,34 @@ func socks5Handshake(conn net.Conn) (string, error) {
 
 	l := len(info)
 	port := int(info[l-2])<<8 | int(info[l-1])
-	var hostStr string
+	var host string
 
 	switch info[0] {
 	case IPV4:
 		if l < 7 {
 			return "", errInvalid
 		}
-		hostStr = net.IP(info[1:5]).String()
+		host = net.IP(info[1:5]).String()
 
 	case DOMAIN:
 		domainLen := int(info[1])
 		if l < 4+domainLen {
 			return "", errInvalid
 		}
-		host := string(info[2 : domainLen+2])
+		host = string(info[2 : domainLen+2])
 		if !util.IsValidHost(host) {
 			return "", errInvalid
 		}
-		hostStr = host
 
 	case IPV6:
 		if l < 19 {
 			return "", errInvalid
 		}
-		hostStr = net.IP(info[1:17]).String()
+		host = net.IP(info[1:17]).String()
 
 	default:
 		return "", errInvalid
 	}
 
-	return fmt.Sprintf("%s:%d", hostStr, port), nil
+	return fmt.Sprintf("%s:%d", host, port), nil
 }
