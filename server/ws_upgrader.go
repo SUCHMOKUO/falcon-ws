@@ -2,32 +2,28 @@ package server
 
 import (
 	"errors"
-	"net/http"
-	"sync"
-	"time"
-
+	"github.com/SUCHMOKUO/falcon-ws/configs"
 	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 	"github.com/gorilla/websocket"
-)
-
-const (
-	wsTimeout = 10 * time.Second
-	wsBufSize = 10300
+	"net/http"
+	"sync"
 )
 
 var (
 	// websocket upgrader.
 	upgrader = websocket.Upgrader{
-		HandshakeTimeout: wsTimeout,
-		ReadBufferSize:   wsBufSize,
-		WriteBufferSize:  wsBufSize,
+		HandshakeTimeout: configs.Timeout,
+		ReadBufferSize:   configs.MaxPackageSize,
+		WriteBufferSize:  configs.MaxPackageSize,
 		WriteBufferPool:  &sync.Pool{
 			New: func() interface{} {
-				return make([]byte, wsBufSize)
+				return make([]byte, configs.MaxPackageSize)
 			},
 		},
 	}
+)
 
+var (
 	errUpgradeFail = errors.New("ws upgrade fail")
 )
 

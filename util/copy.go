@@ -2,14 +2,16 @@ package util
 
 import (
 	"io"
+
+	"github.com/SUCHMOKUO/falcon-ws/configs"
 )
 
 func CopyIO(dst io.WriteCloser, src io.ReadCloser) {
-	var bufArr [10240]byte
-	buf := bufArr[:]
+	// TODO: performance improve. buf will be moved to heap... but why?
+	var buf [configs.MaxPackageSize]byte
 
 	for {
-		n, err := src.Read(buf)
+		n, err := src.Read(buf[:])
 		if n > 0 {
 			_, err := dst.Write(buf[:n])
 			if err != nil {

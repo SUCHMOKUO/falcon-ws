@@ -82,3 +82,19 @@ func BenchmarkAllocateStack(b *testing.B) {
 		allocStack()
 	}
 }
+
+func BenchmarkSliceOnArray(b *testing.B) {
+	var arr [1<<16]byte
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = arr[:]
+	}
+}
+
+func BenchmarkSliceOnSlice(b *testing.B) {
+	s := make([]byte, 1<<16)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = s[:]
+	}
+}

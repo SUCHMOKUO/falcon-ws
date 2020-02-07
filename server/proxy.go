@@ -1,15 +1,13 @@
 package server
 
 import (
+	"github.com/SUCHMOKUO/falcon-ws/configs"
 	"log"
 	"net"
-	"time"
 
 	"github.com/SUCHMOKUO/falcon-ws/mux/stream"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 )
-
-const dialTimeout = 10 * time.Second
 
 func proxy(s *stream.Stream) {
 	buf := make([]byte, 260)
@@ -21,7 +19,7 @@ func proxy(s *stream.Stream) {
 
 	addr := string(buf[:n])
 
-	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
+	conn, err := net.DialTimeout("tcp", addr, configs.Timeout)
 	if err != nil {
 		s.Close()
 		return

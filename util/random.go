@@ -2,13 +2,12 @@ package util
 
 import (
 	"crypto/rand"
-	"math"
 	"math/big"
 	"strconv"
 )
 
 func RandomUint32() uint32 {
-	res, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
+	res, _ := rand.Int(rand.Reader, big.NewInt(1<<32))
 	return uint32(res.Uint64())
 }
 

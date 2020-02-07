@@ -2,6 +2,7 @@ package client
 
 import (
 	"crypto/tls"
+	"github.com/SUCHMOKUO/falcon-ws/configs"
 	"io"
 	"io/ioutil"
 	"log"
@@ -9,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
 	"github.com/SUCHMOKUO/falcon-ws/messageconn"
 	"github.com/SUCHMOKUO/falcon-ws/mux"
@@ -17,13 +17,6 @@ import (
 	"github.com/SUCHMOKUO/falcon-ws/socks5"
 	"github.com/SUCHMOKUO/falcon-ws/util"
 	"github.com/gorilla/websocket"
-)
-
-const (
-	// connection time out
-	timeout = 10 * time.Second
-
-	bufSize = 10300
 )
 
 // Client
@@ -49,12 +42,12 @@ func New(cfg *Config) *Client {
 	c := new(Client)
 	c.config = cfg
 	c.dialer = websocket.Dialer{
-		HandshakeTimeout: timeout,
-		ReadBufferSize:   bufSize,
-		WriteBufferSize:  bufSize,
+		HandshakeTimeout: configs.Timeout,
+		ReadBufferSize:   configs.MaxPackageSize,
+		WriteBufferSize:  configs.MaxPackageSize,
 		WriteBufferPool: &sync.Pool{
 			New: func() interface{} {
-				return make([]byte, bufSize)
+				return make([]byte, configs.MaxPackageSize)
 			},
 		},
 		TLSClientConfig: &tls.Config{
