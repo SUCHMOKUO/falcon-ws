@@ -2,16 +2,26 @@ package util
 
 import (
 	"io"
+	"sync"
 
 	"github.com/SUCHMOKUO/falcon-ws/configs"
 )
 
+var copyIOBufPool = &sync.Pool{
+	New: func() interface{} {
+		var buf [configs.MaxPackageSize]byte
+		return buf[:]
+	},
+}
+
 func CopyIO(dst io.WriteCloser, src io.ReadCloser) {
 	// TODO: performance improve. buf will be moved to heap... but why?
-	var buf [configs.MaxPackageSize]byte
+	//var buf [configs.MaxPackageSize]byte
+	buf := copyIOBufPool.Get().([]byte)
+	defer copyIOBufPool.Put(buf)
 
 	for {
-		n, err := src.Read(buf[:])
+		n, err := src.Read(buf)
 		if n > 0 {
 			_, err := dst.Write(buf[:n])
 			if err != nil {

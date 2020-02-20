@@ -17,15 +17,13 @@ func newTestConn() *testConn {
 	}
 }
 
-func (t *testConn) Read(p []byte) (n int, err error) {
-	return copy(p, <-t.dataChan), nil
+func (t *testConn) ReadMessage() (msg []byte, err error) {
+	return <-t.dataChan, nil
 }
 
-func (t *testConn) Write(p []byte) (n int, err error) {
-	buf := make([]byte, len(p))
-	n = copy(buf, p)
-	t.dataChan <- buf
-	return n, nil
+func (t *testConn) WriteMessage(msg []byte) error {
+	t.dataChan <- msg
+	return nil
 }
 
 func (t *testConn) Close() error {
@@ -40,10 +38,9 @@ func TestConnGroup(t *testing.T) {
 	done := make(chan bool)
 	res := make(map[string]bool, 10)
 	go func() {
-		buf := make([]byte, 1024)
 		for i := 0; i < 10; i++ {
-			n, _ := cg.ReadMessage(buf)
-			res[string(buf[:n])] = true
+			msg, _ := cg.ReadMessage()
+			res[string(msg)] = true
 		}
 		done <- true
 	}()

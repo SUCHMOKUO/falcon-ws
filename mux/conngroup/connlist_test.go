@@ -8,12 +8,12 @@ type testIO struct {
 	id int
 }
 
-func (t testIO) Read(p []byte) (n int, err error) {
-	return 0, nil
+func (t testIO) ReadMessage() (msg []byte, err error) {
+	return nil, nil
 }
 
-func (t testIO) Write(p []byte) (n int, err error) {
-	return 0, nil
+func (t testIO) WriteMessage(msg []byte) error {
+	return nil
 }
 
 func (t testIO) Close() error {
