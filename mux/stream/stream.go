@@ -111,12 +111,39 @@ func (s *Stream) PutFrame(f *Frame) {
 	s.receiveChan <- f
 }
 
-func (s *Stream) GetFrame() (*Frame, error) {
-	f, ok := <-s.sendChan
-	if !ok {
+func (s *Stream) GetFrames() ([]*Frame, error) {
+	frames := make([]*Frame, 0, 2)
+	f1, ok1 := <-s.sendChan
+	if !ok1 {
 		return nil, errStreamClosed
 	}
-	return f, nil
+	frames = append(frames, f1)
+
+	var f2 *Frame = nil
+	var ok2 bool
+	var chanRead bool
+
+	select {
+	case f2, ok2 = <-s.sendChan:
+		chanRead = true
+	default:
+		chanRead = false
+	}
+
+	if chanRead && !ok2 {
+		// channel closed.
+		return frames, errStreamClosed
+	}
+
+	if chanRead && ok2 && f2 != nil {
+		if f2.Ctl == FIN {
+			f1.Ctl = FIN
+		} else {
+			frames = append(frames, f2)
+		}
+	}
+
+	return frames, nil
 }
 
 func (s *Stream) closeRead() {

@@ -64,12 +64,16 @@ func (m *Mux) Accept() (*stream.Stream, error) {
 
 func (m *Mux) streamDataSender(s *stream.Stream) {
 	for {
-		f, err := s.GetFrame()
+		fs, err := s.GetFrames()
+		if fs != nil {
+			for _, f := range fs {
+				m.cg.WriteMessage(f.Serialize())
+				log.Printf("[Stream] %d, type: %d, seq: %d, send %d bytes.\n", f.StreamId, f.Ctl, f.Seq, len(f.Data))
+			}
+		}
 		if err != nil {
 			return
 		}
-		m.cg.WriteMessage(f.Serialize())
-		log.Printf("[Stream] %d, type: %d, seq: %d, send %d bytes.\n", f.StreamId, f.Ctl, f.Seq, len(f.Data))
 	}
 }
 

@@ -69,14 +69,16 @@ func TestWrite(t *testing.T) {
 	done := make(chan bool)
 
 	go func() {
-		for {
-			f, err := w.GetFrame()
+		outLoop: for {
+			fs, err := w.GetFrames()
 			if err != nil {
 				t.Error(err)
 			}
-			r.PutFrame(f)
-			if f.Ctl == FIN {
-				break
+			for _, f := range fs {
+				r.PutFrame(f)
+				if f.Ctl == FIN {
+					break outLoop
+				}
 			}
 		}
 		done <- true
